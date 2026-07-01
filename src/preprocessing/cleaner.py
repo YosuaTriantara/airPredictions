@@ -1,11 +1,10 @@
 import pandas as pd
 
-# Konversi ppb -> ug/m3 pada kondisi standar (25 C, 1 atm): ug/m3 = ppb * MW / 24.45
 MOLAR_MASS = {
     "co": 28.01,
     "no": 30.01,
     "no2": 46.0055,
-    "nox": 46.0055,  # NOx dilaporkan setara NO2
+    "nox": 46.0055,  
     "so2": 64.066,
 }
 
@@ -94,11 +93,21 @@ def _load_openaq_data(path: str) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
-def clean_openaq_csv(path: str, convert_ppb: bool = False) -> pd.DataFrame:
-    df_long = _load_openaq_data(path)
+def clean_openaq_df(df_long: pd.DataFrame, convert_ppb: bool = False) -> pd.DataFrame:
+    """
+    Sama persis dengan clean_openaq_csv, tapi menerima DataFrame long-format yang
+    sudah diambil (mis. dari repository.get_last_24_hours di database), bukan path
+    file CSV. Dipakai oleh pipeline inference; clean_openaq_csv tetap ada untuk
+    pemakaian offline/CLI dengan file CSV.
+    """
     df_long = convert_units(df_long, convert_ppb=convert_ppb)
     df_wide = pivot_to_wide(df_long)
     df_hourly = resample_hourly(df_wide)
     df_hourly = add_missing_pollutants(df_hourly)
     df_hourly = impute_missing_values(df_hourly)
     return df_hourly
+
+
+def clean_openaq_csv(path: str, convert_ppb: bool = False) -> pd.DataFrame:
+    df_long = _load_openaq_data(path)
+    return clean_openaq_df(df_long, convert_ppb=convert_ppb)

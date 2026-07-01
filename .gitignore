@@ -2,3 +2,5 @@
 /artifacts
 /data/processed
 /models
+__pycache__
+*node_modules/
