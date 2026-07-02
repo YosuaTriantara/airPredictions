@@ -1,20 +1,3 @@
-"""
-ingest.py
-Pipeline: OpenAQ API -> Parameter Mapping -> air_quality_measurements
-
-Alur (sesuai diagram di Struktur_Database.pdf):
-    Scheduler
-      -> OpenAQ API
-      -> Parameter Mapping
-      -> air_quality_measurements
-
-Jalankan manual:
-    python scripts/ingest.py
-
-Jalankan sebagai scheduler terus-menerus:
-    python scripts/scheduler.py
-"""
-
 import logging
 from datetime import datetime, timezone
 

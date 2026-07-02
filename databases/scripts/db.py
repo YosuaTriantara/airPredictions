@@ -1,8 +1,3 @@
-"""
-db.py
-Koneksi ke PostgreSQL + helper query dasar.
-"""
-
 import os
 import logging
 from contextlib import contextmanager
@@ -15,19 +10,25 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+DATABASE_URL = os.getenv("DATABASE_URL")
+
 DB_CONFIG = {
     "host": os.getenv("DB_HOST", "localhost"),
     "port": os.getenv("DB_PORT", "5432"),
-    "dbname": os.getenv("DB_NAME", "aqi_db "),
+    "dbname": os.getenv("DB_NAME", "postgres"),
     "user": os.getenv("DB_USER", "postgres"),
-    "password": os.getenv("DB_PASSWORD", "rusuden"),
+    "password": os.getenv("DB_PASSWORD", ""),
+    "sslmode": os.getenv("DB_SSLMODE", "require"),
 }
 
 
 @contextmanager
 def get_connection():
     """Context manager: buka koneksi, commit/rollback otomatis, lalu tutup."""
-    conn = psycopg2.connect(**DB_CONFIG)
+    if DATABASE_URL:
+        conn = psycopg2.connect(DATABASE_URL)
+    else:
+        conn = psycopg2.connect(**DB_CONFIG)
     try:
         yield conn
         conn.commit()

@@ -1,9 +1,3 @@
-"""
-openaq_client.py
-Wrapper tipis di atas OpenAQ API v3 (butuh API key, header X-API-Key).
-Docs: https://docs.openaq.org/
-"""
-
 import os
 import logging
 import requests
@@ -18,7 +12,6 @@ API_KEY = os.getenv("OPENAQ_API_KEY")
 
 HEADERS = {"X-API-Key": API_KEY} if API_KEY else {}
 
-# Mapping nama parameter OpenAQ -> nama kolom database kita
 PARAM_MAP = {
     "pm25": "pm25",
     "pm10": "pm10",

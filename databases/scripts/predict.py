@@ -1,21 +1,3 @@
-"""
-predict.py
-Contoh alur ketika user menekan tombol "Predict" (lihat diagram di PDF):
-
-    Frontend -> POST /predict
-             -> SELECT last 24 rows
-             -> DataFrame
-             -> Preprocessing -> Scaling -> Window -> LSTM
-             -> Prediction
-             -> simpan ke tabel `predictions`
-             -> log ke `model_logs`
-
-File ini hanya kerangka (skeleton) integrasi database + logging.
-Bagian load_model() / preprocess() / model.predict() perlu diisi
-sesuai model LSTM kamu sendiri (mis. file .h5 / .keras yang sudah dilatih
-dengan feature_cols = [PM2.5, PM10, NO, NO2, NOx, CO, SO2, O3]).
-"""
-
 import logging
 import pandas as pd
 

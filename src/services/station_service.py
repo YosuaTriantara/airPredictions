@@ -1,18 +1,19 @@
-# from src.database.repository import repository
+from src.database.repository import repository
 
 
-# class StationService:
+class StationService:
 
-#     def all(self):
-#         return repository.get_all_station()
+    def all(self):
+        return repository.get_all_station()
 
-#     def detail(
-#         self,
-#         station_id
-#     ):
+    def detail(
+        self,
+        station_id
+    ):
 
-#         return repository.get_station(
-#             station_id
-#         )
+        return repository.get_station(
+            station_id
+        )
 
-# station_service = StationService()
+
+station_service = StationService()

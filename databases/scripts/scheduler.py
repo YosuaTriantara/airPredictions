@@ -1,11 +1,3 @@
-"""
-scheduler.py
-Menjalankan ingest.py secara berkala (default tiap 60 menit, atur via .env).
-
-Jalankan:
-    python scripts/scheduler.py
-"""
-
 import os
 import logging
 from apscheduler.schedulers.blocking import BlockingScheduler

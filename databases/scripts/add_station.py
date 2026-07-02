@@ -1,12 +1,3 @@
-"""
-add_station.py
-Helper untuk mendaftarkan sebuah OpenAQ location ke tabel `stations`.
-
-Contoh pakai:
-    python scripts/add_station.py --location-id 5123
-    python scripts/add_station.py --search "Denpasar"
-"""
-
 import argparse
 import logging
 

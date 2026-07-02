@@ -14,7 +14,8 @@ router = APIRouter(
 
 @router.post("/")
 def predict(
+    request: PredictRequest,
     service: PredictionService = Depends(get_prediction_service)
 ):
-    result = service.predict()
+    result = service.predict(request.station_id)
     return success(result)
