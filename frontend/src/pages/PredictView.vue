@@ -1,47 +1,95 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import AreaChart from '../components/AreaChart.vue'
 import LungsIcon from '../components/LungsIcon.vue'
-import {
-  STATIONS_GROUPED,
-  getStationById,
-  HORIZONS,
-  POLLUTANT_UNITS,
-  DEFAULT_STATION_ID,
-} from '../data/stations.js'
-import { generateForecast } from '../utils/chartData.js'
+import { useStations } from '../composables/useStations.js'
+import { HORIZONS } from '../data/stations.js'
+import { toPollutantList } from '../utils/pollutants.js'
+import { api } from '../services/api.js'
 import {
   getAqiCategory,
   getCategoryThreshold,
   isWarningLevel,
-  AQI_CATEGORIES,
 } from '../utils/aqi.js'
 
-const selectedId = ref(DEFAULT_STATION_ID)
-const horizon = ref(12)
-const result = ref(null) // { station, horizon, aqi, category, forecast }
+const { stationsGrouped, stations, loading: loadingStations, error: stationsError } =
+  useStations()
 
-function runPrediction() {
-  const station = getStationById(selectedId.value)
-  const forecast = generateForecast(station, horizon.value)
-  const aqi = forecast.target
-  result.value = {
-    station,
-    horizon: horizon.value,
-    aqi,
-    category: getAqiCategory(aqi),
-    forecast,
+const selectedId = ref(null)
+const horizon = ref(12)
+const result = ref(null) // { station, horizon, aqi, category, forecast, predictionTime }
+const latestMeasurement = ref(null)
+const loading = ref(false)
+const errorMsg = ref(null)
+
+// Begitu daftar stasiun selesai dimuat, pilih stasiun pertama sebagai default
+// lalu langsung jalankan prediksi awal.
+watch(
+  stations,
+  (list) => {
+    if (list.length && !selectedId.value) {
+      selectedId.value = list[0].id
+      runPrediction()
+    }
+  },
+  { immediate: true }
+)
+
+function formatHourLabel(iso) {
+  try {
+    return new Date(iso).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return ''
   }
 }
 
-// Tampilkan hasil awal yang sesuai contoh (Delhi – Anand Vihar, 12 jam).
-runPrediction()
+async function runPrediction() {
+  if (!selectedId.value) return
+  loading.value = true
+  errorMsg.value = null
+  try {
+    const stationId = selectedId.value
+
+    const [predResult, history, latest] = await Promise.all([
+      api.predict(stationId),
+      api.getMeasurementHistory(stationId, horizon.value).catch(() => []),
+      api.getLatestMeasurement(stationId).catch(() => null),
+    ])
+
+    latestMeasurement.value = latest
+
+    const historyRows = history || []
+    const labels = historyRows.map((r) => formatHourLabel(r.measurement_time))
+    const data = historyRows.map((r) => Math.round(r.aqi ?? r.pm25 ?? 0))
+
+    labels.push(`+${horizon.value} Jam`)
+    data.push(Math.round(predResult.aqi))
+
+    const station = stationsGrouped.value
+      .flatMap((g) => g.stations)
+      .find((s) => String(s.id) === String(stationId))
+
+    result.value = {
+      station,
+      horizon: horizon.value,
+      aqi: predResult.aqi,
+      category: getAqiCategory(predResult.aqi),
+      predictionTime: predResult.prediction_time,
+      forecast: { labels, data },
+    }
+  } catch (err) {
+    errorMsg.value = err.message || 'Gagal mengambil prediksi dari server.'
+    result.value = null
+  } finally {
+    loading.value = false
+  }
+}
 
 const chartSeries = computed(() => {
   if (!result.value) return []
   return [
     {
-      name: result.value.station.city,
+      name: result.value.station?.city || 'AQI',
       color: 'var(--chart)',
       data: result.value.forecast.data,
     },
@@ -61,14 +109,7 @@ const thresholdConfig = computed(() => {
 
 const showAlert = computed(() => result.value && isWarningLevel(result.value.aqi))
 
-const pollutants = computed(() => {
-  if (!result.value) return []
-  return Object.entries(result.value.station.pollutants).map(([name, value]) => ({
-    name,
-    value,
-    unit: POLLUTANT_UNITS[name] || '',
-  }))
-})
+const pollutants = computed(() => toPollutantList(latestMeasurement.value))
 </script>
 
 <template>
@@ -80,8 +121,8 @@ const pollutants = computed(() => {
 
       <label class="field-label on-dark" for="station">Stasiun/Kota</label>
       <div class="select-wrap">
-        <select id="station" v-model="selectedId">
-          <optgroup v-for="g in STATIONS_GROUPED" :key="g.state" :label="g.state">
+        <select id="station" v-model="selectedId" :disabled="loadingStations">
+          <optgroup v-for="g in stationsGrouped" :key="g.state" :label="g.state">
             <option v-for="s in g.stations" :key="s.id" :value="s.id">
               {{ s.name }}
             </option>
@@ -97,6 +138,7 @@ const pollutants = computed(() => {
           />
         </svg>
       </div>
+      <p v-if="stationsError" class="fetch-error on-dark">{{ stationsError }}</p>
 
       <p class="field-label on-dark range-label">Rentang Prediksi</p>
       <div class="range-grid">
@@ -111,7 +153,10 @@ const pollutants = computed(() => {
         </button>
       </div>
 
-      <button class="btn predict-btn" @click="runPrediction">Prediksi</button>
+      <button class="btn predict-btn" :disabled="loading || !selectedId" @click="runPrediction">
+        {{ loading ? 'Memuat...' : 'Prediksi' }}
+      </button>
+      <p v-if="errorMsg" class="fetch-error on-dark">{{ errorMsg }}</p>
     </div>
   </section>
 
@@ -133,7 +178,7 @@ const pollutants = computed(() => {
           >
             {{ result.category.name }}
           </span>
-          <p class="result-loc">{{ result.station.name }}</p>
+          <p class="result-loc">{{ result.station?.name }}</p>
           <p class="result-horizon">Prediksi AQI dalam {{ result.horizon }} Jam</p>
         </div>
       </div>
@@ -173,13 +218,18 @@ const pollutants = computed(() => {
 
     <!-- Polutan saat ini -->
     <h2 class="pollutant-heading">Kadar Polutan Saat Ini</h2>
-    <div class="pollutant-grid">
+    <div class="pollutant-grid" v-if="pollutants.length">
       <div v-for="p in pollutants" :key="p.name" class="pollutant-card">
         <span class="pollutant-name">{{ p.name }}</span>
         <span class="pollutant-value">{{ p.value }}</span>
         <span class="pollutant-unit">{{ p.unit }}</span>
       </div>
     </div>
+    <p v-else class="fetch-error">Data polutan terbaru tidak tersedia untuk stasiun ini.</p>
+  </section>
+
+  <section class="container predict-body" v-else-if="loading">
+    <p>Memuat prediksi...</p>
   </section>
 </template>
 
@@ -234,6 +284,15 @@ const pollutants = computed(() => {
 }
 .predict-btn:hover {
   background: #bcd6f1;
+}
+.predict-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.fetch-error {
+  margin: 10px 0 0;
+  color: #ffd7d7;
+  font-size: 0.9rem;
 }
 
 .predict-body {

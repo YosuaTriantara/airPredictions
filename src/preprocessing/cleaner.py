@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 MOLAR_MASS = {
     "co": 28.01,
@@ -33,7 +34,6 @@ def convert_units(df_long: pd.DataFrame, convert_ppb: bool = False) -> pd.DataFr
         mask = is_ppb & (df["parameter"] == param)
         df.loc[mask, "value"] = df.loc[mask, "value"] * mw / 24.45
 
-    # CO training dalam mg/m3, bukan ug/m3 -> bagi 1000 setelah konversi di atas
     co_mask = df["parameter"] == "co"
     df.loc[co_mask, "value"] = df.loc[co_mask, "value"] / 1000.0
 
@@ -58,8 +58,13 @@ def resample_hourly(df_wide: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_missing_pollutants(df_hourly: pd.DataFrame) -> pd.DataFrame:
-    return df_hourly.copy()
+    df_hourly = df_hourly.copy()
 
+    for col in OPENAQ_TO_TRAIN_COLS.values():
+        if col not in df_hourly.columns:
+            df_hourly[col] = np.nan
+
+    return df_hourly
 
 def impute_missing_values(df_hourly: pd.DataFrame) -> pd.DataFrame:
     """3-stage imputation, sama pola dengan pipeline training:
@@ -101,6 +106,11 @@ def clean_openaq_df(df_long: pd.DataFrame, convert_ppb: bool = False) -> pd.Data
     pemakaian offline/CLI dengan file CSV.
     """
     df_long = convert_units(df_long, convert_ppb=convert_ppb)
+    df_long = df_long.copy()
+    df_long["value"] = pd.to_numeric(
+        df_long["value"],
+        errors="coerce"
+    )
     df_wide = pivot_to_wide(df_long)
     df_hourly = resample_hourly(df_wide)
     df_hourly = add_missing_pollutants(df_hourly)
